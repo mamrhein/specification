@@ -27,7 +27,12 @@ from ivalutils import Interval, ClosedInterval, InvalidInterval
 
 
 # TODO: more documentation
-# TODO: factory function 'from_expression'
+# TODO: factory function 'from_expression'? Use case ?
+# TODO: always create canonical form
+# TODO: create and use function for 'is_satisfied_by'
+# TODO: more kind of specifications (in, not in, )
+# TODO: add method __xor__
+# TODO: optimizations by applying boolean algebra rules
 
 
 class Specification(metaclass=ABCMeta):
