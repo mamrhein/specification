@@ -424,3 +424,9 @@ class TestEqualityAndHash(unittest.TestCase):
         self.assertNotEqual(hash(cspec1), hash(cspec3))
         self.assertNotEqual(vspec1, cspec1)
         self.assertNotEqual(hash(vspec1), hash(cspec1))
+        cspec1 = CompositeSpecification(operator.and_, vspec1, vspec3, ispec1,
+                                        ispec3)
+        cspec2 = CompositeSpecification(operator.and_, vspec1, ispec3, vspec3,
+                                        ispec1)
+        self.assertEqual(cspec1, cspec2)
+        self.assertEqual(hash(cspec1), hash(cspec2))

@@ -312,7 +312,7 @@ class CompositeSpecification(Specification):
 
     """Specification which combines other specifications."""
 
-    __slots__ = ('_interface', '_op', '_specs')
+    __slots__ = ('_interface', '_op', '_specs', '_canonical_order')
 
     _map_op2neg = {operator.and_: operator.or_,
                    operator.or_: operator.and_,
@@ -342,8 +342,9 @@ class CompositeSpecification(Specification):
                                      "providing a common interface.")
         self._interface = iface
         self._op = op
-        self._specs = tuple(specs)
         # TODO: reduce nesting level if possible
+        self._specs = tuple(specs)
+        self._canonical_order = tuple(sorted(specs, key=hash))
 
     @property
     def interface(self) -> type:
@@ -352,15 +353,14 @@ class CompositeSpecification(Specification):
 
     def __hash__(self) -> int:
         """hash(self)"""
-        return hash((self.__class__, self._op, self._specs))
+        return hash((self.__class__, self._op, self._canonical_order))
 
     def __eq__(self, other: Any) -> bool:
         """self == other"""
         # pylint: disable=protected-access
         return (isinstance(other, self.__class__) and
                 self._op == other._op and
-                self._specs == other._specs)
-        # TODO: check permutations (-> consequences for __hash__ !!!)
+                self._canonical_order == other._canonical_order)
 
     def is_satisfied_by(self, candidate: Any) -> bool:
         """Return True if candidate satisfies the specification."""
