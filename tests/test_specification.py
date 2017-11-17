@@ -120,23 +120,23 @@ class TestComposition(unittest.TestCase):
         self.ispec2 = IntervalSpecification(ITestObj2, 'ab', (-12, -7))
 
     def testCompositeSpec(self):
-        for op in (operator.and_, operator.or_):
+        for op in (operator.and_, operator.or_, operator.xor):
             cspec = op(self.vspec1, self.vspec2)
             self.assertTrue(isinstance(cspec, Specification))
             self.assertTrue(cspec.interface is ITestObj1)
-        for op in (operator.and_, operator.or_):
+        for op in (operator.and_, operator.or_, operator.xor):
             cspec = op(self.ispec1, self.vspec2)
             self.assertTrue(isinstance(cspec, Specification))
             self.assertTrue(cspec.interface is ITestObj1)
-        for op in (operator.and_, operator.or_):
+        for op in (operator.and_, operator.or_, operator.xor):
             cspec = op(self.ispec1, self.ispec2)
             self.assertTrue(isinstance(cspec, Specification))
             self.assertTrue(cspec.interface is ITestObj1)
-        for op in (operator.and_, operator.or_):
+        for op in (operator.and_, operator.or_, operator.xor):
             cspec = op(self.ispec2, self.vspec2)
             self.assertTrue(isinstance(cspec, Specification))
             self.assertTrue(cspec.interface is ITestObj2)
-        for op in (operator.and_, operator.or_):
+        for op in (operator.and_, operator.or_, operator.xor):
             cspec = CompositeSpecification(op, self.vspec1, self.vspec2,
                                            self.ispec1, self.ispec2)
             self.assertTrue(isinstance(cspec, Specification))
@@ -207,13 +207,13 @@ class TestNegation(unittest.TestCase):
         ispec1 = IntervalSpecification(ITestObj1, 'a',
                                             ClosedInterval(2, 7))
         ispec2 = IntervalSpecification(ITestObj2, 'ab', (-12, -7))
-        for op in (operator.and_, operator.or_):
+        for op in (operator.and_, operator.or_, operator.xor):
             for spec1, spec2 in combinations((vspec1, vspec2,
                                               ispec1, ispec2), 2):
                 spec = op(spec1, spec2)
                 neg_spec = ~spec
                 self.assertTrue(isinstance(neg_spec, Specification))
-                self.assertTrue(neg_spec.interface is spec.interface)
+                self.assertIs(neg_spec.interface, spec.interface)
 
 
 class TestImmutable(unittest.TestCase):
@@ -312,6 +312,8 @@ class TestIsSatisfiedBy(unittest.TestCase):
         self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = CompositeSpecification(operator.or_, vspec1, vspec2, ispec)
         self.assertTrue(cspec.is_satisfied_by(tObj))
+        cspec = CompositeSpecification(operator.xor, vspec1, vspec2, ispec)
+        self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = (vspec1 & vspec2) & ispec
         self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = (vspec1 & vspec2) | ispec
@@ -321,6 +323,14 @@ class TestIsSatisfiedBy(unittest.TestCase):
         cspec = (~vspec1 | vspec2) | ~ispec
         self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = (vspec1 & ~vspec2) & ispec
+        self.assertTrue(cspec.is_satisfied_by(tObj))
+        cspec = (vspec1 & ~vspec2) ^ ispec
+        self.assertFalse(cspec.is_satisfied_by(tObj))
+        cspec = (vspec1 ^ vspec2) & ispec
+        self.assertTrue(cspec.is_satisfied_by(tObj))
+        cspec = ~(vspec1 ^ vspec2) ^ ispec
+        self.assertTrue(cspec.is_satisfied_by(tObj))
+        cspec = ~CompositeSpecification(operator.xor, vspec1, vspec2, ispec)
         self.assertTrue(cspec.is_satisfied_by(tObj))
 
     def testNestedproperty(self):
@@ -360,6 +370,17 @@ class TestRepr(unittest.TestCase):
         cspec = ispec & vspec
         self.assertEqual(repr(cspec),
                          '<ITestObj2 x: all(x.a in [0 .. 6], x.a eq 1)>')
+        vspec1 = ValueSpecification(ITestObj1, 'b', operator.eq, 7)
+        vspec2 = ValueSpecification(ITestObj2, 'ab', operator.lt, 35)
+        ispec = IntervalSpecification(ITestObj1, 'a', (1, 7))
+        cspec = CompositeSpecification(operator.xor, vspec1, vspec2, ispec)
+        self.assertEqual(repr(cspec),
+                         '<ITestObj1 x: contr(x.b eq 7, x.ab lt 35, '
+                         'x.a in [1 .. 7])>')
+        cspec = ~cspec
+        self.assertEqual(repr(cspec),
+                         '<ITestObj1 x: ncontr(x.b ne 7, x.ab ge 35, '
+                         'any(x.a in (-inf .. 1), x.a in (7 .. +inf)))>')
 
 
 class TestEqualityAndHash(unittest.TestCase):

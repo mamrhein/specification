@@ -19,6 +19,7 @@
 
 # standard library imports
 from abc import ABCMeta, abstractmethod
+from functools import reduce
 import operator
 from typing import Any, Callable, Iterable, Tuple, Union
 
@@ -31,7 +32,6 @@ from ivalutils import Interval, ClosedInterval, InvalidInterval
 # TODO: always create canonical form
 # TODO: create and use function for 'is_satisfied_by'
 # TODO: more kind of specifications (in, not in, )
-# TODO: add method __xor__
 # TODO: optimizations by applying boolean algebra rules
 
 
@@ -74,6 +74,11 @@ class Specification(metaclass=ABCMeta):
         """self | other => specification which is the disjunction of self
         and other."""
         return CompositeSpecification(operator.or_, self, other)
+
+    def __xor__(self, other: 'Specification') -> 'Specification':
+        """self ^ other => specification which is the contradiction of self
+        and other."""
+        return CompositeSpecification(operator.xor, self, other)
 
     @abstractmethod
     def __hash__(self) -> int:
@@ -288,6 +293,21 @@ class NegatedSpecification(Specification):
         return "not (%s)" % self._spec.term(candidate_name)
 
 
+def xnor(a, b):
+    "Same as not a ^ b."
+    return not a ^ b
+
+
+def contr(it: Iterable) -> bool:
+    """Return it[0] ^ it[1] ^ ... ^ it[n]"""
+    return reduce(operator.xor, it)
+
+
+def ncontr(it: Iterable) -> bool:
+    """Return not (it[0] ^ it[1] ^ ... ^ it[n])"""
+    return reduce(xnor, it)
+
+
 class CompositeSpecification(Specification):
 
     """Specification which combines other specifications."""
@@ -295,10 +315,14 @@ class CompositeSpecification(Specification):
     __slots__ = ('_interface', '_op', '_specs')
 
     _map_op2neg = {operator.and_: operator.or_,
-                   operator.or_: operator.and_}
+                   operator.or_: operator.and_,
+                   operator.xor: xnor,
+                   xnor: operator.xor}
 
     _map_op2iter = {operator.and_: all,
-                    operator.or_: any}
+                    operator.or_: any,
+                    operator.xor: contr,
+                    xnor: ncontr}
 
     def __init__(self, op: Callable[[Iterable], bool], *specs: Specification):
         assert op in self._map_op2iter
@@ -336,7 +360,7 @@ class CompositeSpecification(Specification):
         return (isinstance(other, self.__class__) and
                 self._op == other._op and
                 self._specs == other._specs)
-        #TODO: check permutations (-> consequences for __hash__ !!!)
+        # TODO: check permutations (-> consequences for __hash__ !!!)
 
     def is_satisfied_by(self, candidate: Any) -> bool:
         """Return True if candidate satisfies the specification."""
