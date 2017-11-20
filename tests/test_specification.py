@@ -19,7 +19,7 @@
 
 # standard library imports
 from abc import ABC
-from itertools import combinations
+from itertools import chain, combinations
 import operator
 import unittest
 
@@ -30,7 +30,7 @@ from ivalutils import (
 )
 from specification import (
     Specification, NegatedSpecification, CompositeSpecification,
-    IntervalSpecification, ValueSpecification
+    IntervalSpecification, ValueSpecification, xnor
 )
 
 
@@ -110,15 +110,19 @@ class TestComposition(unittest.TestCase):
         self.vspec3 = ValueSpecification('a', operator.eq, 2)
         self.ispec1 = IntervalSpecification('a', ClosedInterval(2, 7))
         self.ispec2 = IntervalSpecification('ab', (-12, -7))
+        self.ispec3 = IntervalSpecification('ab', (-112, 7))
 
     def testCompositeSpec(self):
+        specs = (self.vspec1, self.vspec2)
         for op in (operator.and_, operator.or_, operator.xor):
-            cspec = CompositeSpecification(op, self.vspec1, self.vspec2)
-            self.assertTrue(isinstance(cspec, Specification))
+            cspec = CompositeSpecification(op, *specs)
+            for idx, spec in enumerate(specs):
+                self.assertIs(spec, cspec._specs[idx])
+        specs = (self.ispec2, self.vspec3, self.ispec1)
         for op in (operator.and_, operator.or_, operator.xor):
-            cspec = CompositeSpecification(op, self.ispec2, self.vspec3,
-                                           self.ispec1)
-            self.assertTrue(isinstance(cspec, Specification))
+            cspec = CompositeSpecification(op, *specs)
+            for idx, spec in enumerate(specs):
+                self.assertIs(spec, cspec._specs[idx])
         # invalid operator
         self.assertRaises(AssertionError, CompositeSpecification,
                           operator.eq, self.vspec1, self.vspec2)
@@ -130,6 +134,18 @@ class TestComposition(unittest.TestCase):
         # invalid argument
         self.assertRaises(AssertionError, CompositeSpecification,
                           operator.or_, self.vspec1, self.vspec1, 'abc')
+        # reduced nesting
+        specs1 = (self.vspec1, self.vspec2)
+        specs2 = (self.ispec2, self.vspec3, self.ispec1)
+        xcspec = CompositeSpecification(xnor, *specs1)
+        for op in (operator.and_, operator.or_, operator.xor):
+            cspec1 = CompositeSpecification(op, *specs1)
+            cspec2 = CompositeSpecification(op, *specs2)
+            ncspec = CompositeSpecification(op, cspec1, self.ispec3, xcspec,
+                                            cspec2)
+            for idx, spec in enumerate(chain(specs1, (self.ispec3, xcspec),
+                                             specs2)):
+                self.assertIs(spec, ncspec._specs[idx])
 
 
 class TestNegation(unittest.TestCase):

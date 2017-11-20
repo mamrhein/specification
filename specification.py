@@ -20,6 +20,7 @@
 # standard library imports
 from abc import ABCMeta, abstractmethod
 from functools import reduce
+from itertools import chain
 import operator
 from typing import Any, Callable, Iterable, Tuple, Union
 
@@ -300,10 +301,21 @@ class CompositeSpecification(Specification):
                     xnor: ncontr}
 
     def __init__(self, op: Callable[[Iterable], bool], *specs: Specification):
+        # pylint: disable=protected-access
         assert op in self._map_op2iter
         assert len(specs) > 1
         assert all(isinstance(spec, Specification) for spec in specs)
-        # TODO: reduce nesting level if possible
+        # reduce nesting level if possible
+        specs = list(specs)
+        # (a op b) op c => (a op b op c)
+        to_be_flattened = False
+        for idx, spec in enumerate(specs):
+            if isinstance(spec, CompositeSpecification) and spec._op is op:
+                specs[idx] = spec._specs
+                to_be_flattened = True
+        if to_be_flattened:
+            specs = list(chain(*(s if isinstance(s, Iterable) else (s,)
+                                 for s in specs)))
         self._op = op
         self._specs = tuple(specs)
         self._canonical_order = tuple(sorted(specs, key=hash))
