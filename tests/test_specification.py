@@ -74,73 +74,51 @@ class TestObj3:
 class TestBaseSpecifications(unittest.TestCase):
 
     def testValueSpec(self):
-        params = (ITestObj1, 'b', operator.eq, 2)
+        params = ('b', operator.eq, 2)
         spec = ValueSpecification(*params)
         self.assertTrue(isinstance(spec, Specification))
-        self.assertTrue(spec.interface is ITestObj1)
         self.assertEqual(spec._params(), params)
         # nested attribute
-        params = (ITestObj1, 'b.x.y', operator.eq, 2)
+        params = ('b.x.y', operator.eq, 2)
         spec = ValueSpecification(*params)
         self.assertTrue(isinstance(spec, Specification))
-        self.assertTrue(spec.interface is ITestObj1)
         self.assertEqual(spec._params(), params)
 
     def testIntervalSpec(self):
-        params = (ITestObj1, 'b', ClosedInterval(2, 7))
+        params = ('b', ClosedInterval(2, 7))
         spec = IntervalSpecification(*params)
         self.assertTrue(isinstance(spec, Specification))
-        self.assertTrue(spec.interface is ITestObj1)
         self.assertEqual(spec._params(), params)
-        spec = IntervalSpecification(ITestObj1, 'b', (2, 7))
+        spec = IntervalSpecification('b', (2, 7))
         self.assertTrue(isinstance(spec, Specification))
-        self.assertTrue(spec.interface is ITestObj1)
         self.assertEqual(spec._params(), params)
         # nested attribute
-        params = (ITestObj1, 'b.xyz', ClosedInterval(2, 7))
+        params = ('b.xyz', ClosedInterval(2, 7))
         spec = IntervalSpecification(*params)
         self.assertTrue(isinstance(spec, Specification))
-        self.assertTrue(spec.interface is ITestObj1)
         # wrong number of values
-        self.assertRaises(ValueError, IntervalSpecification,
-                          ITestObj1, 'b', (2, 7, 3))
+        self.assertRaises(ValueError, IntervalSpecification, 'b', (2, 7, 3))
         # wrong type of interval
-        self.assertRaises(TypeError, IntervalSpecification,
-                          ITestObj1, 'b', {2, 7})
+        self.assertRaises(TypeError, IntervalSpecification, 'b', {2, 7})
 
 
 class TestComposition(unittest.TestCase):
 
     def setUp(self):
-        self.vspec1 = ValueSpecification(ITestObj1, 'b', operator.eq, 2)
-        self.vspec2 = ValueSpecification(ITestObj2, 'ab', operator.gt, 20)
-        self.vspec3 = ValueSpecification(TestObj3, 'a', operator.eq, 2)
-        self.ispec1 = IntervalSpecification(ITestObj1, 'a',
-                                            ClosedInterval(2, 7))
-        self.ispec2 = IntervalSpecification(ITestObj2, 'ab', (-12, -7))
+        self.vspec1 = ValueSpecification('b', operator.eq, 2)
+        self.vspec2 = ValueSpecification('ab', operator.gt, 20)
+        self.vspec3 = ValueSpecification('a', operator.eq, 2)
+        self.ispec1 = IntervalSpecification('a', ClosedInterval(2, 7))
+        self.ispec2 = IntervalSpecification('ab', (-12, -7))
 
     def testCompositeSpec(self):
         for op in (operator.and_, operator.or_, operator.xor):
-            cspec = op(self.vspec1, self.vspec2)
+            cspec = CompositeSpecification(op, self.vspec1, self.vspec2)
             self.assertTrue(isinstance(cspec, Specification))
-            self.assertTrue(cspec.interface is ITestObj1)
         for op in (operator.and_, operator.or_, operator.xor):
-            cspec = op(self.ispec1, self.vspec2)
+            cspec = CompositeSpecification(op, self.ispec2, self.vspec3,
+                                           self.ispec1)
             self.assertTrue(isinstance(cspec, Specification))
-            self.assertTrue(cspec.interface is ITestObj1)
-        for op in (operator.and_, operator.or_, operator.xor):
-            cspec = op(self.ispec1, self.ispec2)
-            self.assertTrue(isinstance(cspec, Specification))
-            self.assertTrue(cspec.interface is ITestObj1)
-        for op in (operator.and_, operator.or_, operator.xor):
-            cspec = op(self.ispec2, self.vspec2)
-            self.assertTrue(isinstance(cspec, Specification))
-            self.assertTrue(cspec.interface is ITestObj2)
-        for op in (operator.and_, operator.or_, operator.xor):
-            cspec = CompositeSpecification(op, self.vspec1, self.vspec2,
-                                           self.ispec1, self.ispec2)
-            self.assertTrue(isinstance(cspec, Specification))
-            self.assertTrue(cspec.interface is ITestObj1)
         # invalid operator
         self.assertRaises(AssertionError, CompositeSpecification,
                           operator.eq, self.vspec1, self.vspec2)
@@ -152,9 +130,6 @@ class TestComposition(unittest.TestCase):
         # invalid argument
         self.assertRaises(AssertionError, CompositeSpecification,
                           operator.or_, self.vspec1, self.vspec1, 'abc')
-        # incompatible specs
-        self.assertRaises(ValueError, CompositeSpecification,
-                          operator.or_, self.vspec1, self.vspec3)
 
 
 class TestNegation(unittest.TestCase):
@@ -164,77 +139,59 @@ class TestNegation(unittest.TestCase):
                          (operator.lt, operator.ge),
                          (operator.gt, operator.le),
                          (operator.is_, operator.is_not)]:
-            spec1 = ValueSpecification(ITestObj1, 'a', op1, 1)
-            spec2 = ValueSpecification(ITestObj1, 'a', op2, 1)
+            spec1 = ValueSpecification('a', op1, 1)
+            spec2 = ValueSpecification('a', op2, 1)
             neg_spec1 = ~spec1
             neg_spec2 = ~spec2
             self.assertTrue(isinstance(neg_spec1, Specification))
-            self.assertTrue(neg_spec1.interface is spec1.interface)
             self.assertTrue(isinstance(neg_spec2, Specification))
-            self.assertTrue(neg_spec2.interface is spec2.interface)
             self.assertEqual(spec1, neg_spec2)
             self.assertEqual(spec2, neg_spec1)
             self.assertEqual(spec1, ~neg_spec1)
             self.assertEqual(spec2, ~neg_spec2)
         # non-predefined operator:
-        spec = ValueSpecification(ITestObj1, 'a', lambda x, y: x == y, 1)
+        spec = ValueSpecification('a', lambda x, y: x == y, 1)
         neg_spec = ~spec
         self.assertTrue(isinstance(neg_spec, Specification))
-        self.assertTrue(neg_spec.interface is spec.interface)
         self.assertEqual(spec, ~neg_spec)
 
     def testIntervalSpec(self):
-        spec = IntervalSpecification(ITestObj1, 'a', (1, 7))
+        spec = IntervalSpecification('a', (1, 7))
         neg_spec = ~spec
         self.assertTrue(isinstance(neg_spec, Specification))
-        self.assertTrue(neg_spec.interface is spec.interface)
-        spec = IntervalSpecification(ITestObj2, 'ab',
-                                          LowerOpenInterval(-12))
+        spec = IntervalSpecification('ab', LowerOpenInterval(-12))
         neg_spec = ~spec
         self.assertTrue(isinstance(neg_spec, Specification))
-        self.assertTrue(neg_spec.interface is spec.interface)
-        spec = IntervalSpecification(ITestObj2, 'ab',
-                                          UpperOpenInterval(-12))
+        spec = IntervalSpecification('ab', UpperOpenInterval(-12))
         neg_spec = ~spec
         self.assertTrue(isinstance(neg_spec, Specification))
-        self.assertTrue(neg_spec.interface is spec.interface)
-        spec = IntervalSpecification(ITestObj1, 'a', Interval())
+        spec = IntervalSpecification('a', Interval())
         self.assertRaises(InvalidInterval, operator.invert, spec)
 
     def testCompositeSpec(self):
-        vspec1 = ValueSpecification(ITestObj1, 'b', operator.eq, 2)
-        vspec2 = ValueSpecification(ITestObj2, 'ab', operator.gt, 20)
-        ispec1 = IntervalSpecification(ITestObj1, 'a',
+        vspec1 = ValueSpecification('b', operator.eq, 2)
+        vspec2 = ValueSpecification('ab', operator.gt, 20)
+        ispec1 = IntervalSpecification('a',
                                             ClosedInterval(2, 7))
-        ispec2 = IntervalSpecification(ITestObj2, 'ab', (-12, -7))
+        ispec2 = IntervalSpecification('ab', (-12, -7))
         for op in (operator.and_, operator.or_, operator.xor):
             for spec1, spec2 in combinations((vspec1, vspec2,
                                               ispec1, ispec2), 2):
                 spec = op(spec1, spec2)
                 neg_spec = ~spec
                 self.assertTrue(isinstance(neg_spec, Specification))
-                self.assertIs(neg_spec.interface, spec.interface)
 
 
 class TestImmutable(unittest.TestCase):
 
     def testImmutable(self):
-        spec = ValueSpecification(ITestObj1, 'b', lambda x, y: x == y, 2)
-        self.assertRaises(AttributeError, setattr, spec, 'interface', 'xx')
-        self.assertRaises(AttributeError, delattr, spec, 'interface')
+        spec = ValueSpecification('b', lambda x, y: x == y, 2)
         self.assertRaises(AttributeError, setattr, spec, 'x', 'xx')
         spec = ~spec
-        self.assertRaises(AttributeError, setattr, spec, 'interface', 'xx')
-        self.assertRaises(AttributeError, delattr, spec, 'interface')
         self.assertRaises(AttributeError, setattr, spec, 'x', 'xx')
-        spec = IntervalSpecification(ITestObj1, 'a', (1, 7))
-        self.assertRaises(AttributeError, setattr, spec, 'interface', 'xx')
-        self.assertRaises(AttributeError, delattr, spec, 'interface')
+        spec = IntervalSpecification('a', (1, 7))
         self.assertRaises(AttributeError, setattr, spec, 'x', 'xx')
-        spec = spec & ValueSpecification(ITestObj1, 'b', operator.eq, 2)
-        self.assertRaises(AttributeError, setattr, spec, 'interface', 'xx')
-        self.assertRaises(AttributeError, delattr, spec, 'interface')
-        self.assertRaises(AttributeError, setattr, spec, 'x', 'xx')
+        spec = spec & ValueSpecification('b', operator.eq, 2)
 
 
 class TestIsSatisfiedBy(unittest.TestCase):
@@ -246,26 +203,26 @@ class TestIsSatisfiedBy(unittest.TestCase):
                          (operator.lt, operator.ge),
                          (operator.gt, operator.le),
                          (operator.is_, operator.is_not)]:
-            spec1 = ValueSpecification(ITestObj1, 'b', op1, val)
-            spec2 = ValueSpecification(ITestObj1, 'b', op2, val)
+            spec1 = ValueSpecification('b', op1, val)
+            spec2 = ValueSpecification('b', op2, val)
             self.assertEqual(spec1.is_satisfied_by(tObj), op1(tObj.b, val))
             self.assertFalse(spec1.is_satisfied_by(tObj) and
                              spec2.is_satisfied_by(tObj))
-            spec1 = ValueSpecification(ITestObj1, 'b', op1, -val)
-            spec2 = ValueSpecification(ITestObj1, 'b', op2, -val)
+            spec1 = ValueSpecification('b', op1, -val)
+            spec2 = ValueSpecification('b', op2, -val)
             self.assertEqual(spec1.is_satisfied_by(tObj), op1(tObj.b, -val))
             self.assertFalse(spec1.is_satisfied_by(tObj) and
                              spec2.is_satisfied_by(tObj))
         # compare instance of subclass
         tObj = TestObj2(b=val)
-        spec = ValueSpecification(ITestObj1, 'b', operator.eq, val)
+        spec = ValueSpecification('b', operator.eq, val)
         self.assertTrue(spec.is_satisfied_by(tObj))
-        spec = ValueSpecification(ITestObj1, 'b', operator.lt, val)
+        spec = ValueSpecification('b', operator.lt, val)
         self.assertFalse(spec.is_satisfied_by(tObj))
         # object with incompatible interface never satisfies spec
         tObj = TestObj3(val)
         for op in (operator.eq, operator.ne, operator.ge, operator.gt):
-            spec = ValueSpecification(ITestObj1, 'b', op, val)
+            spec = ValueSpecification('b', op, val)
             self.assertFalse(spec.is_satisfied_by(tObj))
 
     def testIntervalSpec(self):
@@ -275,7 +232,7 @@ class TestIsSatisfiedBy(unittest.TestCase):
         for ival in [ClosedInterval(0, 10), ClosedInterval(20, 50),
                      LowerOpenInterval(-12), LowerOpenInterval(72),
                      UpperOpenInterval(-12), UpperOpenInterval(72)]:
-            spec = IntervalSpecification(ITestObj2, 'ab', ival)
+            spec = IntervalSpecification('ab', ival)
             self.assertEqual(spec.is_satisfied_by(tObj), ab in ival)
         limits = [3, ab]
         for lower_closed in (True, False):
@@ -285,29 +242,29 @@ class TestIsSatisfiedBy(unittest.TestCase):
                                        add_lower_inf=add_lower_inf,
                                        add_upper_inf=add_upper_inf)
                     for ival in ic:
-                        spec = IntervalSpecification(ITestObj2, 'ab', ival)
+                        spec = IntervalSpecification('ab', ival)
                         self.assertEqual(spec.is_satisfied_by(tObj),
                                          ab in ival)
         # compare instance of subclass
         val = 23
         tObj = TestObj2(b=val)
-        spec = IntervalSpecification(ITestObj1, 'b', (20, 50))
+        spec = IntervalSpecification('b', (20, 50))
         self.assertTrue(spec.is_satisfied_by(tObj))
-        spec = IntervalSpecification(ITestObj1, 'b', (3, 17))
+        spec = IntervalSpecification('b', (3, 17))
         self.assertFalse(spec.is_satisfied_by(tObj))
         # object with incompatible interface never satisfies spec
         tObj = TestObj3(val)
         for min_max in ((0, 5), (20, 25), (67, 70)):
-            spec = IntervalSpecification(ITestObj1, 'b', min_max)
+            spec = IntervalSpecification('b', min_max)
             self.assertFalse(spec.is_satisfied_by(tObj))
 
     def testCompositeSpec(self):
         a, b = 5, 7
         ab = a * b
         tObj = TestObj2(a, b)
-        vspec1 = ValueSpecification(ITestObj1, 'b', operator.eq, b)
-        vspec2 = ValueSpecification(ITestObj2, 'ab', operator.lt, ab)
-        ispec = IntervalSpecification(ITestObj1, 'a', (1, 7))
+        vspec1 = ValueSpecification('b', operator.eq, b)
+        vspec2 = ValueSpecification('ab', operator.lt, ab)
+        ispec = IntervalSpecification('a', (1, 7))
         cspec = CompositeSpecification(operator.and_, vspec1, vspec2, ispec)
         self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = CompositeSpecification(operator.or_, vspec1, vspec2, ispec)
@@ -337,19 +294,19 @@ class TestIsSatisfiedBy(unittest.TestCase):
         a, b = 5, 7
         ab = a * b
         tObj = TestObj1(a=3, b=TestObj2(a, b))
-        vspec = ValueSpecification(ITestObj1, 'b.ab', lambda x, y: x == y, ab)
+        vspec = ValueSpecification('b.ab', lambda x, y: x == y, ab)
         self.assertTrue(vspec.is_satisfied_by(tObj))
-        vspec = ~ValueSpecification(ITestObj1, 'b.ab',
+        vspec = ~ValueSpecification('b.ab',
                                     lambda x, y: x != y, ab)
         self.assertTrue(vspec.is_satisfied_by(tObj))
-        ispec = IntervalSpecification(ITestObj1, 'b.a', (1, 7))
+        ispec = IntervalSpecification('b.a', (1, 7))
         self.assertTrue(ispec.is_satisfied_by(tObj))
         cspec = vspec & ispec
         self.assertTrue(cspec.is_satisfied_by(tObj))
         # undefined nested attribute => result is False
-        vspec = ValueSpecification(ITestObj1, 'b.x', operator.eq, ab)
+        vspec = ValueSpecification('b.x', operator.eq, ab)
         self.assertFalse(vspec.is_satisfied_by(tObj))
-        ispec = IntervalSpecification(ITestObj1, 'b.x', (1, 7))
+        ispec = IntervalSpecification('b.x', (1, 7))
         self.assertFalse(ispec.is_satisfied_by(tObj))
 
 
@@ -360,26 +317,24 @@ class TestRepr(unittest.TestCase):
         def op(x, y):
             return x == y                               # pragma: no cover
 
-        vspec = ValueSpecification(ITestObj2, 'a', op, 1)
-        self.assertEqual(repr(vspec), '<ITestObj2 x: x.a op 1>')
-        self.assertEqual(repr(~vspec), '<ITestObj2 x: not (x.a op 1)>')
-        vspec = ValueSpecification(ITestObj2, 'a', operator.eq, 1)
-        self.assertEqual(repr(vspec), '<ITestObj2 x: x.a eq 1>')
-        ispec = IntervalSpecification(ITestObj2, 'a', (0, 6))
-        self.assertEqual(repr(ispec), '<ITestObj2 x: x.a in [0 .. 6]>')
+        vspec = ValueSpecification('a', op, 1)
+        self.assertEqual(repr(vspec), '<x: x.a op 1>')
+        self.assertEqual(repr(~vspec), '<x: not (x.a op 1)>')
+        vspec = ValueSpecification('a', operator.eq, 1)
+        self.assertEqual(repr(vspec), '<x: x.a eq 1>')
+        ispec = IntervalSpecification('a', (0, 6))
+        self.assertEqual(repr(ispec), '<x: x.a in [0 .. 6]>')
         cspec = ispec & vspec
-        self.assertEqual(repr(cspec),
-                         '<ITestObj2 x: all(x.a in [0 .. 6], x.a eq 1)>')
-        vspec1 = ValueSpecification(ITestObj1, 'b', operator.eq, 7)
-        vspec2 = ValueSpecification(ITestObj2, 'ab', operator.lt, 35)
-        ispec = IntervalSpecification(ITestObj1, 'a', (1, 7))
+        self.assertEqual(repr(cspec), '<x: all(x.a in [0 .. 6], x.a eq 1)>')
+        vspec1 = ValueSpecification('b', operator.eq, 7)
+        vspec2 = ValueSpecification('ab', operator.lt, 35)
+        ispec = IntervalSpecification('a', (1, 7))
         cspec = CompositeSpecification(operator.xor, vspec1, vspec2, ispec)
         self.assertEqual(repr(cspec),
-                         '<ITestObj1 x: contr(x.b eq 7, x.ab lt 35, '
-                         'x.a in [1 .. 7])>')
+                         '<x: contr(x.b eq 7, x.ab lt 35, x.a in [1 .. 7])>')
         cspec = ~cspec
         self.assertEqual(repr(cspec),
-                         '<ITestObj1 x: ncontr(x.b ne 7, x.ab ge 35, '
+                         '<x: ncontr(x.b ne 7, x.ab ge 35, '
                          'any(x.a in (-inf .. 1), x.a in (7 .. +inf)))>')
 
 
@@ -390,9 +345,9 @@ class TestEqualityAndHash(unittest.TestCase):
         def op(x, y):
             return x == y                               # pragma: no cover
 
-        vspec1 = ValueSpecification(ITestObj2, 'a', op, 1)
-        vspec2 = ValueSpecification(ITestObj2, 'a', op, 1)
-        vspec3 = ValueSpecification(ITestObj2, 'a', operator.eq, 1)
+        vspec1 = ValueSpecification('a', op, 1)
+        vspec2 = ValueSpecification('a', op, 1)
+        vspec3 = ValueSpecification('a', operator.eq, 1)
         self.assertEqual(vspec1, vspec2)
         self.assertEqual(hash(vspec1), hash(vspec2))
         self.assertNotEqual(vspec1, vspec3)
@@ -406,9 +361,9 @@ class TestEqualityAndHash(unittest.TestCase):
         self.assertNotEqual(hash(negvspec1), hash(negvspec3))
         self.assertNotEqual(vspec1, negvspec1)
         self.assertNotEqual(hash(vspec1), hash(negvspec1))
-        ispec1 = IntervalSpecification(ITestObj2, 'a', (0, 6))
-        ispec2 = IntervalSpecification(ITestObj2, 'a', (0, 6))
-        ispec3 = IntervalSpecification(ITestObj2, 'a', (0, 5))
+        ispec1 = IntervalSpecification('a', (0, 6))
+        ispec2 = IntervalSpecification('a', (0, 6))
+        ispec3 = IntervalSpecification('a', (0, 5))
         self.assertEqual(ispec1, ispec2)
         self.assertEqual(hash(ispec1), hash(ispec2))
         self.assertNotEqual(ispec1, ispec3)
@@ -424,6 +379,7 @@ class TestEqualityAndHash(unittest.TestCase):
         self.assertNotEqual(hash(cspec1), hash(cspec3))
         self.assertNotEqual(vspec1, cspec1)
         self.assertNotEqual(hash(vspec1), hash(cspec1))
+        # test canonical order:
         cspec1 = CompositeSpecification(operator.and_, vspec1, vspec3, ispec1,
                                         ispec3)
         cspec2 = CompositeSpecification(operator.and_, vspec1, ispec3, vspec3,
