@@ -1,0 +1,92 @@
+# test expression	resulting source
+# literals
+True	True
+False	False
+None	None
+298	298
+02.4850	2.485
+'abc'	'abc'
+"abc"	'abc'
+f"result: {value:{width}.{precision}}"	f"result: {value:{width}.{precision}}"
+f"abc {x!s: >{w}} xyz"	f"abc {x!s: >{w}} xyz"
+f"{'abc'!r:>20}"	f"{'abc'!r:>20}"
+f'{"abc"!r:>20}'	f"{'abc'!r:>20}"
+b'a75'	b'a75'
+b'\n\x1229'	b'\n\x1229'
+[1, 2, 'abc', [], ([None],)]	[1, 2, 'abc', [], ([None],)]
+{1, 2, 3}	{1, 2, 3}
+{{1,2,3}, {a + b, c * d}}	{{1, 2, 3}, {a + b, c * d}}
+{}	{}
+{'a': 1, 'b': [], 'c': {1: True}}	{'a': 1, 'b': [], 'c': {1: True}}
+{2 * 'a': x + y}	{2 * 'a': x + y}
+# variables
+my_var	my_var
+# unary operators
++18	18
+(-100)	-100
+not x	not x
+~ x	~x
+- ( -5 )	--5
+# binary operators
+x + 5	x + 5
+x - y	x - y
+x * y	x * y
+x / y	x / y
+x // y	x // y
+x + y - 4	x + y - 4
+2 ** x + y	2 ** x + y
+x << 2	x << 2
+x >> -y << 1 & b'0F'	x >> -y << 1 & b'0F'
+# boolean operators
+a and b and c	a and b and c
+a or b or c	a or b or c
+a or b and c	a or b and c
+# comparisons
+x == 5	x == 5
+(x > 6)	x > 6
+0< x<y >z <=6	0 < x < y > z <= 6
+# call
+func  ()	func()
+func( x )	func(x)
+func(**kw)	func(**kw)
+func(a, b = x + 9)	func(a, b=x+9)
+func(*it(x), k = 8, *a, *b, **d)	func(*it(x), *a, *b, k=8, **d)
+# lambda
+lambda a, b=0, c='abc', *d, e, f=None, **g: a * b * c	lambda a, b=0, c='abc', *d, e, f=None, **g: a * b * c
+lambda x = (2 * (y + 5)), **kwds: x	lambda x=2*(y+5), **kwds: x
+# ... if ... else ...
+a if b else (c - d)	a if b else c - d
+(a if b else c) - d	(a if b else c) - d
+(lambda x: x) if a else lambda x: x + 1	(lambda x: x) if a else lambda x: x + 1
+# attribute access
+x.abc	x.abc
+# subscripting
+x[a]	x[a]
+x[2:]	x[2:]
+x[None:]	x[None:]
+x[2:-1]	x[2:-1]
+x[2::2]	x[2::2]
+x[:4]	x[:4]
+x[:-2:y]	x[:-2:y]
+x[::step]	x[::step]
+x[:]	x[:]
+x[4, 3:, :-1:2]	x[4, 3:, :-1:2]
+# comprehensions
+[x * y for x, y in a]	[x * y for x, y in a]
+[x for x in 4 * 'a42' if x.isdigit()]	[x for x in 4 * 'a42' if x.isdigit()]
+[ord(c) for line in file for c in line]	[ord(c) for line in file for c in line]
+{x + y for x, y in {(a, b) for a, b in ml}}	{x + y for x, y in {(a, b) for a, b in ml}}
+(n**2 for n in it if n>5 if n<10)	(n ** 2 for n in it if n > 5 if n < 10)
+{k: v for k, v in zip('abcd', range(4))}	{k: v for k, v in zip('abcd', range(4))}
+# precedence rules
+2 * (x + y)	2 * (x + y)
+year % 4 == 0 and year % 100 != 0 or year % 400 == 0	year % 4 == 0 and year % 100 != 0 or year % 400 == 0
+(((year % 4) == 0) and (((year % 100)) != 0)) or ((year % 400) == 0)	year % 4 == 0 and year % 100 != 0 or year % 400 == 0
+(2 * 2) // 3	2 * 2 // 3
+2 * (2 // 3)	2 * (2 // 3)
+(5 * 20 // 3) * 4	5 * 20 // 3 * 4
+5 * 20 // (3 * 4)	5 * 20 // (3 * 4)
+5 * (20 // (3 * 4))	5 * (20 // (3 * 4))
+5 * (20 // 3) * 4	5 * (20 // 3) * 4
+# corner cases
+func(*(2 * 'abc'))	func(*(2*'abc'))
