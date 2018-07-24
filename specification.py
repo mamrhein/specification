@@ -10,8 +10,6 @@
 #              details please read the file LICENSE.TXT provided together
 #              with the application.
 # ----------------------------------------------------------------------------
-# $Source: specification.py $
-# $Revision: b52a03d85ad6 2018-07-22 20:49 +0200 michael $
 
 
 """Implementation of base classes for specifications"""
@@ -20,9 +18,6 @@
 # standard library imports
 import ast
 from typing import Any, Callable, Mapping, Optional, Union
-
-# third-party imports
-# from ivalutils import Interval, ClosedInterval, InvalidInterval
 
 # local imports
 from _extd_ast_expr import (

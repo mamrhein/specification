@@ -10,8 +10,6 @@
 #              details please read the file LICENSE.TXT provided together
 #              with the application.
 # ----------------------------------------------------------------------------
-# $Source: tests/test_specification.py $
-# $Revision: b52a03d85ad6 2018-07-22 20:49 +0200 michael $
 
 
 """Test driver for module specification."""

@@ -10,8 +10,6 @@
 #              details please read the file LICENSE.TXT provided together
 #              with the application.
 # ----------------------------------------------------------------------------
-# $Source: _extd_ast_expr.py $
-# $Revision: b52a03d85ad6 2018-07-22 20:49 +0200 michael $
 
 
 """Extensions of AST subclasses used in expressions"""
