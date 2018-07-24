@@ -9,8 +9,8 @@ with open('CHANGES.md') as file:
 setup(
     name="specification",
     use_vcs_version=True,
-    setup_requires=["hgtools"],
-    install_requires=["ivalutils"],
+    # setup_requires=[],
+    # install_requires=[],
     packages=find_packages(),
     include_package_data=True,
     author="Michael Amrhein",
@@ -19,7 +19,8 @@ setup(
     description="Python implementaion of the `Specification` pattern",
     long_description=long_description,
     license='BSD',
-    keywords='specification predicate',
+    keywords='specification specification-pattern predicate selection '
+             'validation',
     platforms='all',
     classifiers=[
         "Development Status :: 4 - Beta",
