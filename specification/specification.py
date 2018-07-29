@@ -17,6 +17,7 @@
 
 # standard library imports
 import ast
+import inspect
 from typing import Any, Callable, Mapping, Optional, Union
 
 # local imports
@@ -40,6 +41,20 @@ from ._extd_ast_expr import (
 import builtins
 BUILTIN_NAMES = set(dir(builtins))
 del builtins
+
+
+def _get_external_callers_namespace(frame):
+    module = inspect.getmodule(frame)
+    try:
+        module_name = module.__name__
+    except AttributeError:
+        return frame.f_locals
+    if module_name == __name__:     # called from this module?
+        return _get_external_callers_namespace(frame.f_back)
+    namespace = {name: value for name, value in inspect.getmembers(module)
+                 if not name.startswith('__')}
+    namespace.update(frame.f_locals)
+    return namespace
 
 
 class Specification:
@@ -70,16 +85,20 @@ class Specification:
             self._candidate_name = candidate_name
         self._var_names = var_names
 
-    def is_satisfied_by(self, candidate: Any,
-                        context: Optional[Mapping[str, Any]] = None,
-                        **kwds: Any) -> bool:
+    def is_satisfied_by(self, candidate: Any, **kwds: Any) -> bool:
         """Return True if `candidate` satisfies the specification."""
-        context = context or {}
-        context.update(kwds)
         candidate_name = self._candidate_name
-        if candidate_name in context:
-            raise ValueError(f"Candidate name '{candidate_name}' must not be "
-                             "an element of `context` or given as keyword.")
+        if self._var_names:             # we need additional context
+            # get callers namespace
+            frame = inspect.stack()[1].frame
+            context = _get_external_callers_namespace(frame)
+            context.update(kwds)
+            if candidate_name in context:
+                raise ValueError(f"Candidate name '{candidate_name}' must "
+                                 "not be an element of the callers namespace "
+                                 "or given as keyword.")
+        else:
+            context = {}
         context[candidate_name] = candidate
         try:
             code = self._code
@@ -88,11 +107,9 @@ class Specification:
         return eval(code, context)
 
     # for convenience:
-    def __call__(self, candidate: Any,
-                 context: Optional[Mapping[str, Any]] = None,
-                 **kwds: Any) -> bool:
+    def __call__(self, candidate: Any, **kwds: Any) -> bool:
         """Return True if candidate satisfies the specification."""
-        return self.is_satisfied_by(candidate, context, **kwds)
+        return self.is_satisfied_by(candidate, **kwds)
 
     def __eq__(self, other: Any) -> bool:
         """self == other"""
