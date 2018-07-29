@@ -68,12 +68,6 @@ class TestObj2:
         return self.a * self.b
 
 
-class TestObj3:
-
-    def __init__(self, a):
-        self.a = a
-
-
 class TestConstruction(unittest.TestCase):
 
     def testSpecFromStr(self):
