@@ -20,7 +20,7 @@ import ast
 import os
 import unittest
 
-from _extd_ast_expr import (
+from specification._extd_ast_expr import (
     ast2src,
     Conjunction,
     Contradiction,

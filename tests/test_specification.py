@@ -18,7 +18,7 @@
 # standard library imports
 from abc import ABC
 import ast
-from itertools import chain, combinations
+from itertools import combinations
 import operator
 import unittest
 

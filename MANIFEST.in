@@ -1,4 +1,4 @@
-include LICENCE.*
+include LICENSE
 include CHANGES.*
 recursive-include doc/html [a-zA-Z0-9]*.*
 exclude MANIFEST.in

@@ -20,7 +20,7 @@ import ast
 from typing import Any, Callable, Mapping, Optional, Union
 
 # local imports
-from _extd_ast_expr import (
+from ._extd_ast_expr import (
     ast2src,
     src2ast,
     names,

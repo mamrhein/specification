@@ -8,9 +8,9 @@ with open('CHANGES.md') as file:
 
 setup(
     name="specification",
-    use_vcs_version=True,
-    # setup_requires=[],
-    # install_requires=[],
+    use_scm_version=True,
+    setup_requires=['setuptools_scm'],
+    install_requires=[],
     packages=find_packages(),
     include_package_data=True,
     author="Michael Amrhein",
