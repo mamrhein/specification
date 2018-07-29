@@ -18,6 +18,7 @@
 # standard library imports
 from abc import ABC
 import ast
+from datetime import date
 from itertools import combinations
 import operator
 import unittest
@@ -221,6 +222,28 @@ class TestIsSatisfiedBy(unittest.TestCase):
         spec = Specification(f't.b < {val}')
         self.assertFalse(spec.is_satisfied_by(tObj))
 
+    def testAdditionalContext(self):
+        year = 1999
+        spec = Specification('deadline < date(year, 6, 30)',
+                             candidate_name='deadline')
+        dt = date(year, 5, 1)
+        self.assertTrue(spec(dt))
+        self.assertTrue(spec(dt, year=2000))
+        self.assertFalse(spec(dt, year=1997))
+
+    def testNameConflict(self):
+        # conflict with local var
+        # we must use a local function here
+        def test_spec(spec, candidate):
+            dt = date(2021, 8, 1)
+            return spec(candidate or dt)
+        spec = Specification('dt >= date(2020, 1, 1)', candidate_name='dt')
+        self.assertRaises(ValueError, test_spec, spec, date.today())
+        # conflict with given keyword
+        candidate = date(2021, 8, 1)
+        self.assertRaises(ValueError, spec, candidate, date=date,
+                          dt=date.today())
+
     def testCompositeSpec(self):
         a, b = 5, 7
         ab = a * b
@@ -229,29 +252,29 @@ class TestIsSatisfiedBy(unittest.TestCase):
         spec2 = Specification('t.ab < ab', candidate_name='t')
         spec3 = Specification('1 <= t.a <= 7')
         cspec = spec1 & spec2 & spec3
-        self.assertFalse(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = spec1 | spec2 | spec3
-        self.assertTrue(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertTrue(cspec.is_satisfied_by(tObj))
         cspec = spec1 ^ spec2 ^ spec3
-        self.assertFalse(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = spec1 & (spec2 & spec3)
-        self.assertFalse(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = (spec1 & spec2) | spec3
-        self.assertTrue(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertTrue(cspec.is_satisfied_by(tObj))
         cspec = (spec1 | spec2) & ~spec3
-        self.assertFalse(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = (~spec1 | spec2) | ~spec3
-        self.assertFalse(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = (spec1 & ~spec2) & spec3
-        self.assertTrue(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertTrue(cspec.is_satisfied_by(tObj))
         cspec = (spec1 & ~spec2) ^ spec3
-        self.assertFalse(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertFalse(cspec.is_satisfied_by(tObj))
         cspec = (spec1 ^ spec2) & spec3
-        self.assertTrue(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertTrue(cspec.is_satisfied_by(tObj))
         cspec = ~(spec1 ^ spec2) ^ spec3
-        self.assertTrue(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertTrue(cspec.is_satisfied_by(tObj))
         cspec = ~(spec1 ^ spec2 ^ spec3)
-        self.assertTrue(cspec.is_satisfied_by(tObj, b=b, ab=ab))
+        self.assertTrue(cspec.is_satisfied_by(tObj, ab=ab))
 
     def testNestedproperty(self):
         a, b = 5, 7
