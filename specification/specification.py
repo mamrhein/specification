@@ -45,16 +45,23 @@ del builtins
 
 def _get_external_callers_namespace(frame):
     module = inspect.getmodule(frame)
-    try:
-        module_name = module.__name__
-    except AttributeError:
-        return frame.f_locals
-    if module_name == __name__:     # called from this module?
-        return _get_external_callers_namespace(frame.f_back)
+    if module is None:
+        return frame.f_locals                           # pragma: no cover
     namespace = {name: value for name, value in inspect.getmembers(module)
                  if not name.startswith('__')}
     namespace.update(frame.f_locals)
     return namespace
+
+
+def _merge_namespaces(ns1: Mapping[str, Any], ns2: Mapping[str, Any]) \
+        -> Mapping[str, Any]:
+    common_names = ns1.keys() & ns2.keys()
+    for name in common_names:
+        if ns1[name] is not ns2[name]:
+            raise ValueError(f"Name conflict: {name}")
+    res_ns = dict(ns1)
+    res_ns.update(ns2)
+    return res_ns
 
 
 class Specification:
@@ -63,7 +70,8 @@ class Specification:
     some criteria."""
 
     def __init__(self, expr: Union[str, ast.Expression],
-                 candidate_name: Optional[str] = None) -> None:
+                 candidate_name: Optional[str] = None,
+                 namespace: Optional[Mapping[str, Any]] = None) -> None:
         if isinstance(expr, ast.Expression):
             self._ast_expr = ast_expr = expr
         else:
@@ -83,22 +91,36 @@ class Specification:
                 raise ValueError("Given `candidate_name` not in `expr`.") \
                     from None
             self._candidate_name = candidate_name
-        self._var_names = var_names
+        if var_names:           # we need additional context
+            if namespace is None:
+                # get callers namespace
+                frame = inspect.stack()[1].frame
+                namespace = _get_external_callers_namespace(frame)
+            # check needed names
+            context = {}
+            undef = []
+            for name in var_names:
+                try:
+                    context[name] = namespace[name]
+                except KeyError:
+                    undef.append(name)
+            if undef:
+                msg = (f"Undefined name{'s' * min(len(undef) - 1, 1)}: "
+                       f"{', '.join(undef)}")
+                raise NameError(msg)
+            self._context = context
+        else:
+            self._context = {}
 
     def is_satisfied_by(self, candidate: Any, **kwds: Any) -> bool:
         """Return True if `candidate` satisfies the specification."""
         candidate_name = self._candidate_name
-        if self._var_names:             # we need additional context
-            # get callers namespace
-            frame = inspect.stack()[1].frame
-            context = _get_external_callers_namespace(frame)
-            context.update(kwds)
-            if candidate_name in context:
+        context = self._context
+        if context:
+            if candidate_name in kwds:
                 raise ValueError(f"Candidate name '{candidate_name}' must "
-                                 "not be an element of the callers namespace "
-                                 "or given as keyword.")
-        else:
-            context = {}
+                                 "not be given as keyword.")
+            context.update(kwds)
         context[candidate_name] = candidate
         try:
             code = self._code
@@ -119,19 +141,21 @@ class Specification:
 
     def __invert__(self) -> 'Specification':
         """~self => specification which is the negation of self."""
-        return self.__class__(Negation(self._ast_expr), self._candidate_name)
+        return self.__class__(Negation(self._ast_expr), self._candidate_name,
+                              self._context)
 
     def _combine(self, other: 'Specification',
                  op: Callable[[ast.Expression, ast.Expression],
                               ast.Expression]) -> 'Specification':
         self_candidate_name = self._candidate_name
         other_candidate_name = other._candidate_name
+        namespace = _merge_namespaces(self._context, other._context)
         if self_candidate_name == other_candidate_name:
             return self.__class__(op(self._ast_expr, other._ast_expr),
-                                  self_candidate_name)
+                                  self_candidate_name, namespace)
         else:
-            if self_candidate_name in other._var_names:
-                if other_candidate_name in self._var_names:
+            if self_candidate_name in other._context:
+                if other_candidate_name in self._context:
                     raise ValueError(f"Name conflict: '{self_candidate_name}'"
                                      )
                 else:
@@ -140,12 +164,12 @@ class Specification:
                                                           other_candidate_name
                                                           ),
                                              other._ast_expr),
-                                          other_candidate_name)
+                                          other_candidate_name, namespace)
             return self.__class__(op(self._ast_expr,
                                      replace_name(other._ast_expr,
                                                   other_candidate_name,
                                                   self_candidate_name)),
-                                  self_candidate_name)
+                                  self_candidate_name, namespace)
 
     def __and__(self, other: 'Specification') -> 'Specification':
         """self & other => specification which is the conjunction of self
@@ -168,7 +192,7 @@ class Specification:
 
     def __copy__(self):
         """Return `self` (instances of Specification are immutable)."""
-        return self
+        return self                                     # pragma: no cover
 
     __deepcopy = __copy__
 
@@ -178,7 +202,7 @@ class Specification:
 
     def __repr__(self) -> str:
         """repr(self)"""
-        if self._var_names:
+        if self._context:
             return f"{self.__class__.__name__}('{self._src_expr}'" \
                    f", candidate_name='{self._candidate_name}')"
         else:

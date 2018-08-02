@@ -76,19 +76,21 @@ class TestConstruction(unittest.TestCase):
         spec = Specification(expr)
         self.assertIsInstance(spec._ast_expr, ast.Expression)
         self.assertEqual(spec._candidate_name, 'b')
-        self.assertEqual(spec._var_names, set())
+        self.assertEqual(spec._context, {})
         # nested attribute
         expr = "b.x.y==2"
         spec = Specification(expr)
         self.assertIsInstance(spec._ast_expr, ast.Expression)
         self.assertEqual(spec._candidate_name, 'b')
-        self.assertEqual(spec._var_names, set())
+        self.assertEqual(spec._context, {})
         # nested attribute and context variables
+        y = object()
+        z = object()
         expr = "y.a > x.b >= z.c"
         spec = Specification(expr, candidate_name='x')
         self.assertIsInstance(spec._ast_expr, ast.Expression)
         self.assertEqual(spec._candidate_name, 'x')
-        self.assertEqual(spec._var_names, {'y', 'z'})
+        self.assertEqual(spec._context, {'y': y, 'z': z})
 
     def testSpecFromExpression(self):
         src = "x==1"
@@ -96,7 +98,7 @@ class TestConstruction(unittest.TestCase):
         spec = Specification(expr)
         self.assertIsInstance(spec._ast_expr, ast.Expression)
         self.assertEqual(spec._candidate_name, 'x')
-        self.assertEqual(spec._var_names, set())
+        self.assertEqual(spec._context, {})
 
     def testFailures(self):
         # not an expression
@@ -107,18 +109,27 @@ class TestConstruction(unittest.TestCase):
         self.assertRaises(ValueError, Specification, expr,
                           candidate_name='a')
         # missing candidate name
+        y = 4                                       # noqa
         expr = "x != y"
         self.assertRaises(ValueError, Specification, expr)
+        # undefined context variable
+        expr = "x > y and x < z"
+        self.assertRaises(NameError, Specification, expr, 'x')
 
 
 class TestComposition(unittest.TestCase):
 
     def setUp(self):
-        self.spec1 = Specification("b == 2")
+        self.x = x = object()                        # noqa
+        self.y = y = 5                               # noqa
+        self.z = z = 13                              # noqa
+        self.spec1 = Specification("y == 2")
         self.spec2 = Specification("ab>20")
         self.spec3 = Specification("x==y", candidate_name='x')
         self.spec4 = Specification("x.ab>=z", candidate_name='x')
         self.spec5 = Specification("x.ab>=z", candidate_name='z')
+        self.spec6 = Specification("x.ab>=z", candidate_name='x',
+                                   namespace = {'z': 7})
 
     def testComposites(self):
         # implicit name adjustment
@@ -126,36 +137,47 @@ class TestComposition(unittest.TestCase):
         for op in (operator.and_, operator.or_, operator.xor):
             cspec = op(*specs)
             self.assertIsInstance(cspec._ast_expr, ast.Expression)
-            self.assertEqual(cspec._candidate_name, 'b')
-            self.assertEqual(cspec._var_names, set())
+            self.assertEqual(cspec._candidate_name, 'y')
+            self.assertEqual(cspec._context, {})
         specs = (self.spec2, self.spec1)
         for op in (operator.and_, operator.or_, operator.xor):
             cspec = op(*specs)
             self.assertIsInstance(cspec._ast_expr, ast.Expression)
             self.assertEqual(cspec._candidate_name, 'ab')
-            self.assertEqual(cspec._var_names, set())
+            self.assertEqual(cspec._context, {})
+        specs = (self.spec1, self.spec3)
+        for op in (operator.and_, operator.or_, operator.xor):
+            cspec = op(*specs)
+            self.assertIsInstance(cspec._ast_expr, ast.Expression)
+            self.assertEqual(cspec._candidate_name, 'x')
+            self.assertEqual(cspec._context, {'y': self.y})
         specs = (self.spec3, self.spec2)
         for op in (operator.and_, operator.or_, operator.xor):
             cspec = op(*specs)
             self.assertIsInstance(cspec._ast_expr, ast.Expression)
             self.assertEqual(cspec._candidate_name, 'x')
-            self.assertEqual(cspec._var_names, {'y'})
+            self.assertEqual(cspec._context, {'y': self.y})
         specs = (self.spec2, self.spec3)
         for op in (operator.and_, operator.or_, operator.xor):
             cspec = op(*specs)
             self.assertIsInstance(cspec._ast_expr, ast.Expression)
             self.assertEqual(cspec._candidate_name, 'ab')
-            self.assertEqual(cspec._var_names, {'y'})
+            self.assertEqual(cspec._context, {'y': self.y})
         # multiple context vars
         specs = (self.spec2, self.spec3, self.spec4)
         for op in (operator.and_, operator.or_, operator.xor):
             cspec = op(op(*specs[:2]), specs[2])
             self.assertIsInstance(cspec._ast_expr, ast.Expression)
             self.assertEqual(cspec._candidate_name, 'ab')
-            self.assertEqual(cspec._var_names, {'y', 'z'})
+            self.assertEqual(cspec._context, {'y': self.y, 'z': self.z})
 
     def testNameConflict(self):
+        # conflict between candidate name and context variables name
         specs = (self.spec4, self.spec5)
+        for op in (operator.and_, operator.or_, operator.xor):
+            self.assertRaises(ValueError, op, *specs)
+        # conflicting namespaces
+        specs = (self.spec4, self.spec6)
         for op in (operator.and_, operator.or_, operator.xor):
             self.assertRaises(ValueError, op, *specs)
 
@@ -178,6 +200,7 @@ class TestNegation(unittest.TestCase):
             self.assertEqual(spec1, ~neg_spec1)
             self.assertEqual(spec2, ~neg_spec2)
         # non-predefined operator:
+        op = lambda x, y: x == y                        # noqa
         spec = Specification(f'op(a, 1)', candidate_name='a')
         neg_spec = ~spec
         self.assertTrue(isinstance(neg_spec, Specification))
@@ -187,7 +210,7 @@ class TestNegation(unittest.TestCase):
         spec1 = Specification('b == 2')
         spec2 = Specification('ab > 20')
         spec3 = Specification('2 < a <= 7')
-        spec4 = Specification('ab not in range(-12, -7)', candidate_name='ab')
+        spec4 = Specification('ab not in range(-12, -7)')
         for op in (operator.and_, operator.or_, operator.xor):
             for spec1, spec2 in combinations((spec1, spec2, spec3, spec4), 2):
                 spec = op(spec1, spec2)
@@ -232,13 +255,7 @@ class TestIsSatisfiedBy(unittest.TestCase):
         self.assertFalse(spec(dt, year=1997))
 
     def testNameConflict(self):
-        # conflict with local var
-        # we must use a local function here
-        def test_spec(spec, candidate):
-            dt = date(2021, 8, 1)
-            return spec(candidate or dt)
         spec = Specification('dt >= date(2020, 1, 1)', candidate_name='dt')
-        self.assertRaises(ValueError, test_spec, spec, date.today())
         # conflict with given keyword
         candidate = date(2021, 8, 1)
         self.assertRaises(ValueError, spec, candidate, date=date,
@@ -290,9 +307,21 @@ class TestIsSatisfiedBy(unittest.TestCase):
         self.assertTrue(cspec.is_satisfied_by(tObj))
 
 
+class TestIssue1(unittest.TestCase):
+
+    def setUp(self):
+        from decimal import Decimal                     # noqa
+        self.spec = Specification("x == Decimal('5.4')",
+                                  candidate_name='x')
+
+    def testIsSatisfied(self):
+        self.assertFalse(self.spec.is_satisfied_by(5))
+
+
 class TestReprAndStr(unittest.TestCase):
 
     def testReprAndStr(self):
+        op = lambda x, y: x == y                        # noqa
         spec = Specification('op(o.a,1)', candidate_name='o')
         self.assertEqual(repr(spec),
                          "Specification('op(o.a, 1)', candidate_name='o')")
